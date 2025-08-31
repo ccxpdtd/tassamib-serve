@@ -39,6 +39,7 @@ router.post('/api/login', (req, res) => {
         code: 200,
         ok: 1,
         msg: '登录成功',
+        username: results[0].username,
         token,
         role: results[0].role
       })

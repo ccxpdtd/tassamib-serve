@@ -29,10 +29,10 @@ router.post('/api/uploadArticle', (req, res) => {
     db.query(insertSql, [title, description, author, uname, content], (err2, result) => {
       if (err2) {
         console.error('插入文章失败:', err2);
-        return res.status(500).json({ ok: false, msg: '文章上传失败' });
+        return res.status(500).json({ code: 200, ok: false, msg: '文章上传失败' });
       }
 
-      res.json({ ok: true, msg: '文章上传成功' });
+      res.json({ code: 200, ok: true, msg: '文章上传成功' });
     });
   });
 });
@@ -54,22 +54,30 @@ router.get('/api/get_articles', (req, res) => {
   db.query(sql, (err, results) => {
     if (err) {
       console.error('查询文章失败:', err);
-      return res.json({ ok: false, msg: '查询失败' });
+      return res.json({
+        code: 201,
+        ok: false,
+        msg: '查询失败'
+      });
     }
-    res.send({ ok: 1, msg: '读取文章成功', data: results });
+    res.send({
+      code: 200,
+      ok: 1,
+      msg: '读取文章成功',
+      data: results
+    });
   });
 
 });
 
 //删除指定文章
-router.post('/api/delete_article', (req, res) => {
+router.post('/api/delete_article/:id', (req, res) => {
 
-  const { id } = req.body
-
+  const id = req.params.id;
   const sql = 'DELETE FROM articles WHERE id = ?'
   db.query(sql, [id], (err, result) => {
-    if (err) return res.status(500).send({ ok: 0, msg: '删除文章失败' })
-    if (result.affectedRows > 0) return res.send({ ok: 1, msg: '删除文章成功' })
+    if (err) return res.status(500).send({ code: 201, ok: 0, msg: '删除文章失败' })
+    if (result.affectedRows > 0) return res.send({ code: 200, ok: 1, msg: '删除文章成功' })
   })
 
 })
