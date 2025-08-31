@@ -10,11 +10,12 @@ router.use(express.json())//解析body
 
 const SECRET_KEY = 'your-secret-key' // ✅ 自定义密钥，可放入 .env 文件中
 
-// 登录接口
+// 用户登录接口
 router.post('/api/login', (req, res) => {
 
   const { uname, psw } = req.body
   const sql = 'SELECT * FROM users WHERE username = ? AND password = ?'
+
 
   db.query(sql, [uname, psw], (err, results) => {
     if (err) {
@@ -35,9 +36,11 @@ router.post('/api/login', (req, res) => {
 
       // ✅ 返回 token 给前端
       res.send({
+        code: 200,
         ok: 1,
         msg: '登录成功',
-        token
+        token,
+        role: results[0].role
       })
     } else {
       res.send({ msg: '用户名或密码错误', ok: 0 })
