@@ -14,6 +14,8 @@ const SECRET_KEY = 'your-secret-key' // ✅ 自定义密钥，可放入 .env 文
 router.post('/api/login', (req, res) => {
 
   const { uname, psw } = req.body
+
+
   const sql = 'SELECT * FROM users WHERE username = ? AND password = ?'
 
 

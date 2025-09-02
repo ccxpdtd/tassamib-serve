@@ -82,15 +82,18 @@ router.post('/api/delete_article/:id', (req, res) => {
 
 })
 
-
+//获取指定文章
 router.get('/api/get_article/:id', (req, res) => {
 
   const id = req.params.id;
+
   const sql = 'select * from articles WHERE id = ?'
 
   db.query(sql, [id], (err, result) => {
-    if (err) return res.status(500).send({ ok: 0, msg: '获取文章失败' })
+    if (err) return res.status(500).send({ code: 201, ok: 0, msg: '获取文章失败' })
     if (result.length > 0) return res.send({
+
+      code: 200,
       ok: 1,
       msg: '获取文章成功',
       content: result[0].content

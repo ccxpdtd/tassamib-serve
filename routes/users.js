@@ -9,7 +9,7 @@ router.use(cors())
 
 
 //获取用户信息
-router.get('/admin/get_user', (req, res) => {
+router.get('/api/admin/get_user', (req, res) => {
 
   const sql = 'select * from users;'
 
@@ -32,7 +32,7 @@ router.get('/admin/get_user', (req, res) => {
 })
 
 
-router.post('/admin/add_user', (req, res) => {
+router.post('/api/admin/add_user', (req, res) => {
   const { username, password, role } = req.body
   const sql = `
     insert into users
@@ -56,7 +56,7 @@ router.post('/admin/add_user', (req, res) => {
 })
 
 //删除用户
-router.post('/admin/del_user', (req, res) => {
+router.post('/api/admin/del_user', (req, res) => {
   const { id } = req.body
   const sql = `
     delete from users
@@ -80,7 +80,7 @@ router.post('/admin/del_user', (req, res) => {
 
 
 //修改权限
-router.post('/admin/change_role', (req, res) => {
+router.post('/api/admin/change_role', (req, res) => {
   const { id, role } = req.body
 
   const sql = `
