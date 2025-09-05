@@ -58,25 +58,29 @@ router.post('/api/admin/get_user', (req, res) => {
 //搜索用户
 router.post('/api/admin/search_user', (req, res) => {
   const { username, pageNo, limit } = req.body
+  const trimUsername = username.trim(); // 去除关键字前后空格
+  const likeParam = `%${trimUsername}%`;
   // 计算分页偏移量：(页号-1) * 每页条数（跳过前面的记录）
   const offset = (pageNo - 1) * limit;
   const totalSql = "select count(*) as total from users WHERE username = ? ;"
+
+
   const sql = `
     SELECT *
     FROM users
-    WHERE username = ?
+    WHERE username LIKE ? 
     ORDER BY id
     LIMIT ? OFFSET ?;
   `
 
-  db.query(totalSql, [username], (err, total_result) => {
+  db.query(totalSql, [likeParam], (err, total_result) => {
     if (err) {
       return res.status(500).send({
         code: 201,
         msg: '搜索失败'
       })
     } else {
-      db.query(sql, [username, limit, offset], (err, user_result) => {
+      db.query(sql, [likeParam, limit, offset], (err, user_result) => {
         if (err) {
           return res.status(500).send({
             code: 201,
@@ -84,8 +88,6 @@ router.post('/api/admin/search_user', (req, res) => {
           })
         }
         if (user_result.length > 0) {
-
-
           return res.send({
             code: 200,
             msg: '搜索成功',
@@ -96,17 +98,14 @@ router.post('/api/admin/search_user', (req, res) => {
           return res.send({
             code: 200,
             msg: '抱歉，没有这个用户',
-
+            user: [],
+            total: 0
           })
         }
       })
 
     }
   })
-
-
-
-
 })
 
 //创建新用户
