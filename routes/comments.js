@@ -7,7 +7,7 @@ const db = require('../db/db') // 你自己的数据库连接模块
 router.get('/api/get_comments', (req, res) => {
   const sql = `
                 SELECT 
-                id, message_id as mid, username, content,
+                id, message_id, username, content,
                 DATE_FORMAT(created_at, '%Y-%m-%d %H:%i') AS created_at
                 FROM comments
                 ORDER BY id DESC;
