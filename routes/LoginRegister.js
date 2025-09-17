@@ -15,9 +15,7 @@ router.post('/api/login', (req, res) => {
 
   const { uname, psw } = req.body
 
-
   const sql = 'SELECT * FROM users WHERE username = ? AND password = ?'
-
 
   db.query(sql, [uname, psw], (err, results) => {
     if (err) {

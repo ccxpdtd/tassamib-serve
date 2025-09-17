@@ -74,7 +74,7 @@ router.post('/api/delete_message', (req, res) => {
 
   const sql = 'DELETE FROM messages WHERE id = ?'
   db.query(sql, [id], (err, result) => {
-    if (err) return res.status(500).send({ code: 201, ok: 0, msg: '删除失败' })
+    if (err) return res.status(500).send({ code: 500, ok: 0, msg: '删除失败' })
     if (result.affectedRows > 0) return res.send({ code: 200, ok: 1, msg: '删除成功' })
   })
 })

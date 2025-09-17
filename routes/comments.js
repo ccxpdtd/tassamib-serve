@@ -51,8 +51,6 @@ router.post('/api/delete_reply', (req, res) => {
 
   const { id, mid } = req.body
 
-
-
   const comment_sql = 'DELETE FROM comments WHERE id = ?'
   const message_sql = 'update messages set comment_count= comment_count-1 where id=?;'
 
