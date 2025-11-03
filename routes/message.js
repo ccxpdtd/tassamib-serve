@@ -1,81 +1,87 @@
-const cors = require('cors')
-const db = require('../db/db')
+const db = require('../db')
 const express = require('express')
 
 const router = express.Router()
 
-router.use(cors())
-router.use(express.json())//解析body
+const { matchUser } = require('../util/MiddleWare/User')
+
+const { verifyToken, verifyAdmin } = require('../util/MiddleWare/Auth')
 
 //处理用户留言接口
-router.post('/api/publish_message', (req, res) => {
-  const { uname, msg } = req.body
-  const sql = 'INSERT INTO messages (username,content) VALUES (?,?)'
-  db.query(sql, [uname, msg], (err, result) => {
-    if (err) return res.status(500).send({ ok: 0, msg: '评论失败' })
-    if (result.affectedRows > 0) return res.send({ ok: 1, msg: '评论成功' })
+router.post('/publish_message', verifyToken, (req, res) => {
+  const { user_id, msg } = req.body
+  const sql = 'INSERT INTO messages (user_id,content) VALUES (?,?)'
+  db.query(sql, [user_id, msg], (err, result) => {
+    if (err) return res.status(500).send({ code: 500, msg: '留言失败' })
+    if (result.affectedRows > 0) return res.send({ code: 200, msg: '留言成功' })
+  })
+})
+
+//获取评论表
+const getComments = async () => {
+  return new Promise((resolve, reject) => {
+    const sql = `select * from comments;`
+    db.query(sql, (err, result) => {
+      if (err) {
+        console.log('获取留言回复表数据失败\n', err.message);
+        return reject(err)
+      }
+      resolve(result)
+    })
+  })
+}
+
+
+//封装留言信息
+const handleMessages = async (results) => {
+  const messages = await matchUser(results)
+  const comments = await getComments()
+  const messagesWithComments = await Promise.all(
+    messages.map(async (m) => {
+      // 筛选当前留言的所有评论
+      let comments_m = comments.filter(c => c.message_id === m.id)
+      // 匹配评论的用户（等待异步完成）
+      comments_m = await matchUser(comments_m)
+      return {
+        ...m,
+        comments: comments_m
+      }
+    })
+  )
+  return messagesWithComments
+
+}
+//获取留言
+router.get('/get_messages', (req, res) => {
+  const sql = `
+                SELECT * FROM messages 
+                ORDER BY created_at DESC;
+              `;
+  db.query(sql, async (err, result) => {
+    if (err) {
+      console.error('操作数据库失败', {
+        errMsg: err.message,
+        sql: err.sql,
+
+      })
+      return res.status(500).send({ code: 201, msg: '获取留言失败' });
+    }
+    const messages = await handleMessages(result)
+    // console.log('messages', messages);
+
+    return res.send({ code: 200, msg: '获取留言成功', messages });
   })
 })
 
 
-// 获取留言
-router.get('/api/get_messages', (req, res) => {
-  const message_sql = `
-    SELECT 
-      id, username, content,comment_count,
-      DATE_FORMAT(created_at, '%Y-%m-%d %H:%i') AS created_at 
-    FROM messages 
-    ORDER BY id DESC;
-  `;
-
-  const comment_sql = `
-    SELECT 
-      id, message_id, username, content,
-      DATE_FORMAT(created_at, '%Y-%m-%d %H:%i') AS created_at
-    FROM comments
-    ORDER BY created_at ASC;
-  `;
-
-  db.query(message_sql, (err, messages) => {
-    if (err) return res.status(500).send({ code: 201, ok: 0, msg: '查询留言失败' });
-
-    db.query(comment_sql, (err2, comments) => {
-      if (err2) return res.status(500).send({ code: 201, ok: 0, msg: '查询评论失败' });
-
-      // 把评论挂载到对应留言上
-      const messageMap = {};
-      messages.forEach(msg => {
-        msg.replies = []; // 添加一个 replies 字段
-        messageMap[msg.id] = msg;
-      });
-
-      comments.forEach(cmt => {
-        if (messageMap[cmt.message_id]) {
-          messageMap[cmt.message_id].replies.push(cmt);
-        }
-      });
-
-      res.send({
-        code: 200,
-        ok: 1,
-        msg: '获取留言及评论成功',
-        data: messages
-      });
-
-    });
-  });
-});
-
-
 //处理留言删除接口
-router.post('/api/delete_message', (req, res) => {
+router.post('/delete_message', verifyToken, (req, res) => {
 
   const { id } = req.body
-
   const sql = 'DELETE FROM messages WHERE id = ?'
   db.query(sql, [id], (err, result) => {
-    if (err) return res.status(500).send({ code: 500, ok: 0, msg: '删除失败' })
-    if (result.affectedRows > 0) return res.send({ code: 200, ok: 1, msg: '删除成功' })
+    if (err) return res.status(500).send({ code: 500, msg: '删除留言失败' })
+    if (result.affectedRows > 0) return res.send({ code: 200, msg: '删除留言成功' })
   })
 })
 
@@ -94,7 +100,7 @@ const queryPromise = (sql, params) => {
 };
 
 // 搜索留言（修复版）
-router.post('/api/admin/search_messages', async (req, res) => {
+router.post('/admin/search_messages', async (req, res) => {
   try {
     const { key } = req.body;
 

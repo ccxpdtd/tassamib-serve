@@ -1,75 +1,112 @@
-const cors = require('cors')
-const db = require('../db/db')
-const express = require('express')
+require('dotenv').config()
+const db = require('../db')
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken') // ✅ 引入 JWT 模块
 
+const express = require('express')
 const router = express.Router()
 
-router.use(cors())
-router.use(express.json())//解析body
 
-const SECRET_KEY = 'your-secret-key' // ✅ 自定义密钥，可放入 .env 文件中
+const CODE_TTL = process.env.CODE_TTL;     // 验证码有效期
+const SECRET_KEY = process.env.JWT_SECRET //token密钥
 
-// 用户登录接口
-router.post('/api/login', (req, res) => {
+const redisClient = require('../redis/index');
+const { sendVerifyEmail } = require('../mailer');
+const {
+  getCode,
+  checkCode,
+  checkRateLimit_MW,
+  checkEmail_MW
+} = require('../util/MiddleWare/EmailAndCode')
+const { getUserByEmail } = require('../util/MiddleWare/User')
 
-  const { uname, psw } = req.body
 
-  const sql = 'SELECT * FROM users WHERE username = ? AND password = ?'
 
-  db.query(sql, [uname, psw], (err, results) => {
-    if (err) {
-      console.error('数据库登录用户查询失败:', err)
-      return res.status(500).send('登录失败')
-    }
+const { isUserExitMW, checkPassword_MW } = require('../util/MiddleWare/Login')
 
-    if (results.length > 0) {
-      const user = results[0]
-
-      // ✅ 生成 token，包含用户 id 和用户名，可自行添加字段
-      const token = jwt.sign(
-        // { id: user.id, username: user.username, ava: user.avatar },
-        { id: user.id, username: user.username, role: user.role },
-        SECRET_KEY,
-        { expiresIn: '2h' } // Token 两小时后过期
-      )
-
-      // ✅ 返回 token 给前端
-      res.send({
-        code: 200,
-        ok: 1,
-        msg: '登录成功',
-        username: results[0].username,
-        token,
-        role: results[0].role
-      })
-    } else {
-      res.send({ msg: '用户名或密码错误', ok: 0 })
-    }
+// 用户密码登录接口
+router.post('/login', isUserExitMW, checkPassword_MW, (req, res) => {
+  checkCode
+  const user = req.body.user
+  // ✅ 生成 token，包含用户 id 和用户名，可自行添加字段
+  const token = jwt.sign(
+    {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      avatar: user.avatar
+    },
+    SECRET_KEY,
+    { expiresIn: '2h' } // Token 两小时后过期
+  )
+  // ✅ 返回 token 给前端
+  res.send({
+    code: 200,
+    msg: '登录成功',
+    token,
   })
 })
 
 
-//#region 册接口
-router.post('/api/register', (req, res) => {
-  const { uname, psw } = req.body
 
-  const sql_select = 'SELECT * FROM users WHERE username = ?'
-  db.query(sql_select, [uname], (err, result) => {
-    if (err) return res.status(500).send('注册失败')
-    else if (result.length > 0) {
-      return res.send({ msg: '用户已存在', ok: 0 })
-    } else {
-      const sql = 'INSERT INTO users (username, password) VALUES (?, ?)'
-      db.query(sql, [uname, psw], (err, result) => {
-        if (err) return res.status(500).send('注册失败')
-        res.send({ msg: '注册成功', ok: 1 })
-      })
-    }
+// 用户邮箱验证码登录接口
+router.post('/loginByVerifyCode', checkEmail_MW, async (req, res) => {
+  const { email, code } = req.body
+  const ok = await checkCode(email, code)
+  if (!ok) return res.send({ code: 201, msg: '验证码错误或过期' })
+
+  const user = await getUserByEmail(email)
+  // ✅ 生成 token，包含用户 id 和用户名，可自行添加字段
+  const token = jwt.sign(
+    {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      gender: user.gender,
+      birdthday: user.birthday
+    },
+    SECRET_KEY,
+    { expiresIn: '2h' } // Token 两小时后过期
+  )
+  // ✅ 返回 token 给前端
+  res.send({
+    code: 200,
+    msg: '登录成功',
+    token,
   })
-
 })
 
-//#endregion
+
+
+// 发送邮箱验证码
+router.post('/sendCode', checkEmail_MW, checkRateLimit_MW, async (req, res) => {
+  try {
+    const { email } = req.body;
+    const code = getCode();
+    await redisClient.set(`emailCode:${email}`, code, { EX: CODE_TTL });
+    await sendVerifyEmail(email, code);
+    res.send({ code: 200, msg: '验证码已发送' });
+  } catch (err) {
+    console.error('sendCode error:', err);
+    res.status(500).send({ ok: 0, code: 500, msg: '验证码发送失败' });
+  }
+});
+
+// 用户注册
+router.post('/register', async (req, res) => {
+  const { email, password, name, code } = req.body;
+  const ok = await checkCode(email, code)
+  if (!ok) return res.send({ code: 201, msg: '验证码错误或过期' })
+  const hash = await bcrypt.hash(password, 10);
+  const sql = 'INSERT INTO users (email, password, name) VALUES (?,?,?)';
+  db.query(sql, [email, hash, name], (err, result) => {
+    if (err)
+      return res.status(500).send({ code: 500, msg: '注册失败' });
+    return res.send({ code: 200, msg: '注册成功' });
+  });
+});
+
 
 module.exports = router

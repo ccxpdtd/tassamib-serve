@@ -1,10 +1,10 @@
 // routes/article.js
 const express = require('express')
 const router = express.Router()
-const db = require('../db/db') // 你自己的数据库连接模块
+const db = require('../db') // 你自己的数据库连接模块
 
 // 上传文章（只有管理员可以上传）
-router.post('/api/uploadArticle', (req, res) => {
+router.post('/uploadArticle', (req, res) => {
   const { uname, title, description, author, content } = req.body;
 
   // 先查这个用户名的 role
@@ -12,16 +12,16 @@ router.post('/api/uploadArticle', (req, res) => {
   db.query(checkUserSql, [uname], (err, results) => {
     if (err) {
       console.error('查询用户权限失败:', err);
-      return res.status(500).json({ ok: false, msg: '服务器错误' });
+      return res.status(500).json({ code: 500, msg: '服务器错误' });
     }
 
     if (results.length === 0) {
-      return res.status(403).json({ ok: false, msg: '用户不存在' });
+      return res.status(403).json({ code: 201, msg: '用户不存在' });
     }
 
     const role = results[0].role;
     if (role !== 'admin') {
-      return res.status(403).json({ ok: false, msg: '你没有权限发布文章' });
+      return res.status(403).json({ code: 201, msg: '你没有权限发布文章' });
     }
 
     // 插入文章
@@ -29,16 +29,16 @@ router.post('/api/uploadArticle', (req, res) => {
     db.query(insertSql, [title, description, author, uname, content], (err2, result) => {
       if (err2) {
         console.error('插入文章失败:', err2);
-        return res.status(500).json({ code: 200, ok: false, msg: '文章上传失败' });
+        return res.status(500).json({ code: 200, msg: '文章上传失败' });
       }
 
-      res.json({ code: 200, ok: true, msg: '文章上传成功' });
+      res.json({ code: 200, msg: '文章上传成功' });
     });
   });
 });
 
 // 读取所有文章接口
-router.get('/api/get_articles', (req, res) => {
+router.get('/get_articles', (req, res) => {
 
   const sql = `SELECT 
                 id, 
@@ -55,48 +55,44 @@ router.get('/api/get_articles', (req, res) => {
     if (err) {
       console.error('查询文章失败:', err);
       return res.json({
-        code: 201,
-        ok: false,
+        code: 500,
         msg: '查询失败'
       });
     }
     res.send({
       code: 200,
-      ok: 1,
       msg: '读取文章成功',
-      data: results
+      articles: results
     });
   });
 
 });
 
 //删除指定文章
-router.post('/api/delete_article/:id', (req, res) => {
+router.post('/delete_article/:id', (req, res) => {
 
   const id = req.params.id;
   const sql = 'DELETE FROM articles WHERE id = ?'
   db.query(sql, [id], (err, result) => {
-    if (err) return res.status(500).send({ code: 201, ok: 0, msg: '删除文章失败' })
-    if (result.affectedRows > 0) return res.send({ code: 200, ok: 1, msg: '删除文章成功' })
+    if (err) return res.status(500).send({ code: 500, msg: '删除文章失败' })
+    if (result.affectedRows > 0) return res.send({ code: 200, msg: '删除文章成功' })
   })
 
 })
 
 //获取指定文章
-router.get('/api/get_article/:id', (req, res) => {
+router.get('/get_article/:id', (req, res) => {
 
   const id = req.params.id;
 
   const sql = 'select * from articles WHERE id = ?'
 
   db.query(sql, [id], (err, result) => {
-    if (err) return res.status(500).send({ code: 201, ok: 0, msg: '获取文章失败' })
-    if (result.length > 0) return res.send({
-
+    if (err) return res.status(500).send({ code: 500, msg: '获取文章失败' })
+    return res.send({
       code: 200,
-      ok: 1,
       msg: '获取文章成功',
-      content: result[0].content
+      article: result[0]
     })
   })
 })
